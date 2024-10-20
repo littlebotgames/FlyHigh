@@ -1,0 +1,20 @@
+-- These are example strings.
+"menuResumeGame" = "Resume"
+"menuNewGame" = "New Game"
+"menuOptions" =	"Options"
+"menuCredits" =	"Credits"
+
+"convoPencil1_enter" = "Peel, paint and polish for me please."
+"convoPencil1_a" = "Did you hear about old Billy? Got his head stuck in the hoover?"
+"convoPencil1_b" = "Silly Billy Hoover Head they're calling him now."
+"convoPencil1_leave" = "I love it! See you next time."
+
+"convoPencil2_enter" = "The full works for me."
+"convoPencil2_a" = "I been pickling radishes this year. Radishes I tell you."
+"convoPencil2_b" = "They are gonna taste real nice on a bit of toast."
+"convoPencil2_leave" = "Thanking you very much, I'll bring in some radishes next time."
+
+"convoPencil3_enter" = "Hook me up with the lot."
+"convoPencil3_a" = "This picture I was drawing yesterday of a penguin."
+"convoPencil3_b" = "Pink it was! A pink penguin. Who ever heard of such a thing?"
+"convoPencil3_leave" = "I shall go to the ball."

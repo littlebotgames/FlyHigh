@@ -1,0 +1,8 @@
+name=Fly High
+author=Little Bot Games
+description=GDG Game Jam Oct 2024.
+bundleID=com.littlebot.flyhigh
+version=0.0.1
+buildNumber=1
+imagePath=assets/launcher/
+launchSoundPath=assets/launcher/sound.wav
