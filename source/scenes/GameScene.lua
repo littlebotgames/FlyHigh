@@ -17,7 +17,7 @@ function scene:init()
 	local function getTreeSpawnY()
 		return math.random(300, 400)
 	end
-	self.treeLayer = BackgroundLayer.new(createTree, 3, 0.5, getTreeSpawnY)
+	self.treeLayer = BackgroundLayer.new(createTree, 2, 0.5, getTreeSpawnY)
 
 	local function getTreeForegroundSpawnY()
 		return math.random(240, 260)
@@ -38,19 +38,23 @@ function scene:init()
 		end
 	end
 	local function getCloudSpawnY()
-		return math.random(0, 80)
+		return math.random(-200, 80)
 	end
 	self.cloudLayer = BackgroundLayer.new(createCloud, 3, 0.3, getCloudSpawnY)
 
 	self.birdHead = NobleSprite("assets/images/head", true)
 	self.birdHead:setSize(64, 64)
+	self.birdHead:setIgnoresDrawOffset(true)
 
 	self.birdHead.animation:addState("default", 1, 1, nil, true)
 	self.birdHead.animation:addState("blink", 1, self.birdHead.animation.imageTable:getLength(), "default", false, nil, 0.3)
 
 	self.birdBody = NobleSprite("assets/images/Body")
+	self.birdBody:setIgnoresDrawOffset(true)
+
 	self.birdLegs = NobleSprite("assets/images/legs", true)
 	self.birdLegs:setSize(80, 64)
+	self.birdLegs:setIgnoresDrawOffset(true)
 
 	self.birdLegs.animation:addState("default", 1, 1, nil, true)
 	self.birdLegs.animation:addState("run", 2, 3, nil, true, nil, 0.1)
@@ -58,26 +62,29 @@ function scene:init()
 
 	self.birdWings = NobleSprite("assets/images/wings", true)
 	self.birdWings:setSize(80, 80)
+	self.birdWings:setIgnoresDrawOffset(true)
 
 	self.birdWings.animation:addState("default", 1, 1, nil, true)
-	self.birdWings.animation:addState("fly", 1, self.birdWings.animation.imageTable:getLength(), nil, true, nil, 0.1)
+	self.birdWings.animation:addState("flapUp", 1, 1)
+	self.birdWings.animation:addState("flapDown", 2, 2)
 
 	self.birdIsRunning = false
-	self.birdIsFlying = false
 
 	-- Test start flying.
-	self.birdIsFlying = true
-	self.birdWings.animation:setState(self.birdWings.animation.fly)
+	self.birdWings.animation:setState(self.birdWings.animation.default)
 	self.birdLegs.animation:setState(self.birdLegs.animation.tuck)
+
+	self.yPos = 0
+
+	self.birdFlapPos = 0
+	self.birdLift = 0
+	self.birdLiftDelta = 5
+	self.birdLiftDecel = 10
 
 	self.inputHandler = {
 		upButtonDown = function()
-			--self.birdIsFlying = true
-			--self.birdWings.animation:setState(self.birdWings.animation.fly)
 		end,
 		upButtonUp = function()
-			--self.birdIsFlying = false
-			--self.birdWings.animation:setState(self.birdWings.animation.default)
 		end,
 		downButtonDown = function()
 		end,
@@ -90,6 +97,17 @@ function scene:init()
 			--self.birdLegs.animation:setState(self.birdLegs.animation.default)
 		end,
 		cranked = function(change, acceleratedChange)
+			local crankPos = playdate.getCrankPosition()
+			if self.birdFlapPos == 0 and crankPos > 135 and crankPos < 225 then
+				-- Flap down.
+				self.birdFlapPos = 1
+				self.birdWings.animation:setState(self.birdWings.animation.flapDown)
+				self.birdLift += self.birdLiftDelta
+			elseif self.birdFlapPos == 1 and crankPos > 315 or crankPos < 45 then
+				-- Flap up.
+				self.birdFlapPos = 0
+				self.birdWings.animation:setState(self.birdWings.animation.flapUp)
+			end
 		end,
 		AButtonDown = function()
 		end
@@ -155,6 +173,21 @@ function scene:update()
 		-- Blink.
 		self.birdHead.animation:setState(self.birdHead.animation.blink)
 	end
+
+	if self.birdLift > 0 then
+		-- Decelerate the lift down to 0.
+		self.birdLift -= self.birdLiftDecel * Noble.elapsedTime
+		self.birdLift = math.max(self.birdLift, 0)
+
+		-- Lift damn you!
+		self.yPos -= self.birdLift * Noble.elapsedTime
+	else
+		-- Fall with gravity.
+		local gravity = 5
+		self.yPos += gravity * Noble.elapsedTime
+	end
+
+	Graphics.setDrawOffset(0, -self.yPos)
 end
 
 
