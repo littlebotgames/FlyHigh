@@ -1,10 +1,20 @@
 import "scripts/BackgroudLayer"
+import "scripts/Enums/FlapPosition"
+import "scripts/Enums/WingDirection"
+import "scripts/MathExtensions"
 
 GameScene = {}
 class("GameScene").extends(NobleScene)
 local scene = GameScene
 
 scene.baseColor = Graphics.kColorWhite
+
+-- Constants.
+local BirdDrag = -5
+local Gravity = 20
+local BirdFlapStrength = 300
+local RunAccel = 20
+local MaxRunSpeed = 50
 
 function scene:init()
 	scene.super.init(self)
@@ -15,12 +25,12 @@ function scene:init()
         return sprite
 	end
 	local function getTreeSpawnY()
-		return math.random(300, 400)
+		return math.random(0, 100)
 	end
 	self.treeLayer = BackgroundLayer.new(createTree, 2, 0.5, getTreeSpawnY)
 
 	local function getTreeForegroundSpawnY()
-		return math.random(240, 260)
+		return math.random(200, 300)
 	end
 	self.treeForegroundLayer = BackgroundLayer.new(createTree, 1, 1.2, getTreeForegroundSpawnY)
 
@@ -38,7 +48,7 @@ function scene:init()
 		end
 	end
 	local function getCloudSpawnY()
-		return math.random(-200, 80)
+		return math.random(-500, -300)
 	end
 	self.cloudLayer = BackgroundLayer.new(createCloud, 3, 0.3, getCloudSpawnY)
 
@@ -68,49 +78,71 @@ function scene:init()
 	self.birdWings.animation:addState("flapUp", 1, 1)
 	self.birdWings.animation:addState("flapDown", 2, 2)
 
-	self.birdIsRunning = false
+	-- Get rotated images for the wings for when the direction is set.
+	self.birdWingsImageTables = {}
+	for i = 1, WingDirection.length, 1 do
+		local dirX, dirY = self.wingDirectionToVec(i)
+		local angleDeg = math.dirToDeg(dirX, dirY) - 90
+		local imageTable = Graphics.imagetable.new("assets/images/wings")
+		for imageIndex = 1, #imageTable, 1 do
+			local image = imageTable:getImage(imageIndex)
+			image = image:rotatedImage(angleDeg)
+			imageTable:setImage(imageIndex, image)
+			self.birdWingsImageTables[i] = imageTable
+		end
+	end
 
-	-- Test start flying.
-	self.birdWings.animation:setState(self.birdWings.animation.default)
-	self.birdLegs.animation:setState(self.birdLegs.animation.tuck)
+	self.grounded = true
+
+	-- Initialise anims.
+	self.birdWings.animation:setState(self.birdWings.animation.flapUp)
+	self.birdLegs.animation:setState(self.birdLegs.animation.run)
 
 	self.yPos = 0
 
-	self.birdFlapPos = 0
+	-- Bird flight vars.
+	self.birdFlapPos = FlapPosition.Down
+
+	self.birdVelX = 0
+	self.birdVelY = 0
+
 	self.birdLift = 0
-	self.birdLiftDelta = 5
-	self.birdLiftDecel = 10
+	self.birdThrust = 0
+
+	self:setWingDirection(WingDirection.Down)
 
 	self.inputHandler = {
-		upButtonDown = function()
-		end,
-		upButtonUp = function()
-		end,
 		downButtonDown = function()
+			self:setWingDirection(WingDirection.Down)
 		end,
 		rightButtonDown = function()
-			--self.birdIsRunning = true
-			--self.birdLegs.animation:setState(self.birdLegs.animation.run)
+			self:setWingDirection(WingDirection.Forward)
 		end,
-		rightButtonUp = function()
-			--self.birdIsRunning = false
-			--self.birdLegs.animation:setState(self.birdLegs.animation.default)
+		leftButtonDown = function()
+			self:setWingDirection(WingDirection.Back)
 		end,
 		cranked = function(change, acceleratedChange)
 			local crankPos = playdate.getCrankPosition()
-			if self.birdFlapPos == 0 and crankPos > 135 and crankPos < 225 then
-				-- Flap down.
-				self.birdFlapPos = 1
-				self.birdWings.animation:setState(self.birdWings.animation.flapDown)
-				self.birdLift += self.birdLiftDelta
-			elseif self.birdFlapPos == 1 and crankPos > 315 or crankPos < 45 then
-				-- Flap up.
-				self.birdFlapPos = 0
-				self.birdWings.animation:setState(self.birdWings.animation.flapUp)
+			if self.birdFlapPos == FlapPosition.Up and crankPos > 135 and crankPos < 225 then
+				self:doFlap(FlapPosition.Down)
+			elseif self.birdFlapPos == FlapPosition.Down and crankPos > 315 or crankPos < 45 then
+				self:doFlap(FlapPosition.Up)
 			end
 		end,
 		AButtonDown = function()
+			if self.birdFlapPos == FlapPosition.Down then
+				self:doFlap(FlapPosition.Up)
+			elseif self.birdFlapPos == FlapPosition.Up then
+				self:doFlap(FlapPosition.Down)
+			end
+		end,
+		--[[
+		BButtonDown = function()
+			if self.birdFlapPos == FlapPosition.Up then
+				doFlap(FlapPosition.Down)
+			end
 		end
+		--]]
 	}
 end
 
@@ -160,13 +192,50 @@ end
 
 function scene:update()
 	scene.super.update(self)
+	
+	local accelX = self.birdThrust
+	if self.grounded and self.birdVelX < MaxRunSpeed then
+		-- Running on the ground.
+		accelX += RunAccel
+	end
+	self.birdVelX += accelX * Noble.elapsedTime
+	self.birdVelX = math.max(self.birdVelX + BirdDrag * Noble.elapsedTime, 0)
 
-	local moveSpeed = 50
-	local moveDelta = moveSpeed * Noble.elapsedTime
+	-- Rise due to going fast.
+	self.birdLift -= self.birdVelX * Noble.elapsedTime
+	local accelY = self.birdLift + Gravity
+	self.birdVelY += accelY * Noble.elapsedTime
 
-	self.treeLayer:move(moveDelta)
-	self.cloudLayer:move(moveDelta)
-	self.treeForegroundLayer:move(moveDelta)
+	local moveXDelta = self.birdVelX * Noble.elapsedTime
+	self.yPos += self.birdVelY * Noble.elapsedTime
+
+	-- Clamp to ground position.
+	local newGrounded = false
+	if self.yPos > 0 then
+		self.yPos = 0
+		self.birdVelY = 0
+		newGrounded = true
+	else
+		newGrounded = false
+	end
+
+	-- Start / stop running depending on if we are on the ground.
+	if self.grounded ~= newGrounded then
+		self.grounded = newGrounded
+		if self.grounded then
+			self.birdLegs.animation:setState(self.birdLegs.animation.run)
+		else
+			self.birdLegs.animation:setState(self.birdLegs.animation.tuck)
+		end
+	end
+
+	-- Move in the X.
+	self.treeLayer:move(moveXDelta)
+	self.cloudLayer:move(moveXDelta)
+	self.treeForegroundLayer:move(moveXDelta)
+
+	-- Move in the Y.
+	Graphics.setDrawOffset(0, -self.yPos)
 
 	local blinkChance = 50
 	if not self.birdBlinking and math.random(blinkChance) == 1 then
@@ -174,21 +243,36 @@ function scene:update()
 		self.birdHead.animation:setState(self.birdHead.animation.blink)
 	end
 
-	if self.birdLift > 0 then
-		-- Decelerate the lift down to 0.
-		self.birdLift -= self.birdLiftDecel * Noble.elapsedTime
-		self.birdLift = math.max(self.birdLift, 0)
-
-		-- Lift damn you!
-		self.yPos -= self.birdLift * Noble.elapsedTime
-	else
-		-- Fall with gravity.
-		local gravity = 5
-		self.yPos += gravity * Noble.elapsedTime
-	end
-
-	Graphics.setDrawOffset(0, -self.yPos)
+	self.birdThrust = 0
+	self.birdLift = 0
 end
 
+function scene:setWingDirection(wingDirection)
+	self.wingDirection = wingDirection
+	self.birdWingDirX, self.birdWingDirY = self.wingDirectionToVec(wingDirection)
+	self.birdWings:setAnimationImageTable(self.birdWingsImageTables[wingDirection])
+end
 
+function scene.wingDirectionToVec(wingDirection)
+	if wingDirection == WingDirection.Down then
+		return 0, 1
+	elseif wingDirection == WingDirection.Back then
+		return -0.707, 0.707
+	elseif wingDirection == WingDirection.Forward then
+		return 0.707, 0.707
+	end
+end
 
+function scene:doFlap(flapPos)
+	self.birdFlapPos = flapPos
+	if self.birdFlapPos == FlapPosition.Up then
+		-- Flap up.
+		self.birdWings.animation:setState(self.birdWings.animation.flapUp)
+	elseif self.birdFlapPos == FlapPosition.Down then
+		-- Flap down.
+		self.birdWings.animation:setState(self.birdWings.animation.flapDown)
+		-- We get thrust in the opposite direction to the wing.
+		self.birdThrust += BirdFlapStrength * -self.birdWingDirX
+		self.birdLift += BirdFlapStrength * -self.birdWingDirY
+	end
+end

@@ -1,5 +1,5 @@
 import "scripts/EnumUtils"
 
-UIPageID = EnumUtils.createEnum(
+UIPageID = EnumUtils.createEnum({
     "Dialogue"
-)
+})
