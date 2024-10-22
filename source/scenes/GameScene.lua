@@ -10,11 +10,19 @@ local scene = GameScene
 scene.baseColor = Graphics.kColorWhite
 
 -- Constants.
-local BirdDrag = -5
-local Gravity = 20
-local BirdFlapStrength = 300
-local RunAccel = 20
-local MaxRunSpeed = 50
+local BaseDrag = -20
+local WingDirDragOffset =
+{
+	[WingDirection.Down] = 0,
+	[WingDirection.Back] = 5,
+	[WingDirection.Forward] = -5
+}
+local OnGroundDragOffset = -30
+
+local Gravity = 50
+local BirdFlapStrength = 1000
+local RunAccel = 50
+local MaxRunSpeed = 100
 
 function scene:init()
 	scene.super.init(self)
@@ -27,7 +35,7 @@ function scene:init()
 	local function getTreeSpawnY()
 		return math.random(0, 100)
 	end
-	self.treeLayer = BackgroundLayer.new(createTree, 2, 0.5, getTreeSpawnY)
+	self.treeLayer = BackgroundLayer.new(createTree, 4, 0.5, getTreeSpawnY)
 
 	local function getTreeForegroundSpawnY()
 		return math.random(200, 300)
@@ -48,9 +56,9 @@ function scene:init()
 		end
 	end
 	local function getCloudSpawnY()
-		return math.random(-500, -300)
+		return math.random(-1000, -500)
 	end
-	self.cloudLayer = BackgroundLayer.new(createCloud, 3, 0.3, getCloudSpawnY)
+	self.cloudLayer = BackgroundLayer.new(createCloud, 4, 0.3, getCloudSpawnY)
 
 	self.birdHead = NobleSprite("assets/images/head", true)
 	self.birdHead:setSize(64, 64)
@@ -69,6 +77,7 @@ function scene:init()
 	self.birdLegs.animation:addState("default", 1, 1, nil, true)
 	self.birdLegs.animation:addState("run", 2, 3, nil, true, nil, 0.1)
 	self.birdLegs.animation:addState("tuck", 4, 4, nil, true)
+	self.birdRunningSound = playdate.sound.sampleplayer.new("assets/audio/running-bird-footsteps")
 
 	self.birdWings = NobleSprite("assets/images/wings", true)
 	self.birdWings:setSize(80, 80)
@@ -77,6 +86,7 @@ function scene:init()
 	self.birdWings.animation:addState("default", 1, 1, nil, true)
 	self.birdWings.animation:addState("flapUp", 1, 1)
 	self.birdWings.animation:addState("flapDown", 2, 2)
+	self.birdWingFlapSound = playdate.sound.sampleplayer.new("assets/audio/wing-flap-1")
 
 	-- Get rotated images for the wings for when the direction is set.
 	self.birdWingsImageTables = {}
@@ -97,6 +107,7 @@ function scene:init()
 	-- Initialise anims.
 	self.birdWings.animation:setState(self.birdWings.animation.flapUp)
 	self.birdLegs.animation:setState(self.birdLegs.animation.run)
+	--self.birdRunningSound:play(0)
 
 	self.yPos = 0
 
@@ -199,8 +210,15 @@ function scene:update()
 		accelX += RunAccel
 	end
 	self.birdVelX += accelX * Noble.elapsedTime
-	self.birdVelX = math.max(self.birdVelX + BirdDrag * Noble.elapsedTime, 0)
 
+	-- Get current drag to use.
+	local drag = BaseDrag + WingDirDragOffset[self.wingDirection]
+	if self.grounded and self.birdVelX > MaxRunSpeed then
+		-- Add additional drag to slow down to max running speed.
+		drag += OnGroundDragOffset
+	end
+
+	self.birdVelX = math.max(self.birdVelX + drag * Noble.elapsedTime, 0)
 	-- Rise due to going fast.
 	self.birdLift -= self.birdVelX * Noble.elapsedTime
 	local accelY = self.birdLift + Gravity
@@ -224,8 +242,10 @@ function scene:update()
 		self.grounded = newGrounded
 		if self.grounded then
 			self.birdLegs.animation:setState(self.birdLegs.animation.run)
+			--self.birdRunningSound:play(0)
 		else
 			self.birdLegs.animation:setState(self.birdLegs.animation.tuck)
+			self.birdRunningSound:stop()
 		end
 	end
 
@@ -274,5 +294,6 @@ function scene:doFlap(flapPos)
 		-- We get thrust in the opposite direction to the wing.
 		self.birdThrust += BirdFlapStrength * -self.birdWingDirX
 		self.birdLift += BirdFlapStrength * -self.birdWingDirY
+		self.birdWingFlapSound:play(1)
 	end
 end
