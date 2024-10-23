@@ -3,6 +3,7 @@ import "scripts/Enums/FlapPosition"
 import "scripts/Enums/WingDirection"
 import "scripts/MathExtensions"
 import "scripts/LevelLine"
+import "scripts/UI/ScoreUI"
 
 import "assets/data/Level01"
 
@@ -36,6 +37,7 @@ function scene:init()
 	scene.super.init(self)
 
 	self:createLevel()
+	self.scoreUI = ScoreUI(self)
 
 	local function createTree()
 		local sprite = NobleSprite("assets/images/tree01")
@@ -158,6 +160,8 @@ function scene:init()
 
 	self:setWingDirection(WingDirection.Down)
 
+	self.score = 0
+
 	self.inputHandler = {
 		downButtonDown = function()
 			self:setWingDirection(WingDirection.Down)
@@ -211,9 +215,12 @@ function scene:enter()
 
 	self.foliageLayer2:add()
 	self.treeForegroundLayer:add()
+
+	self.scoreUI:add(10, 10)
 end
 
 function scene:exit()
+	self.scoreUI:remove()
 	self.levelLine:remove()
 
 	self.treeForegroundLayer:remove()
@@ -317,6 +324,17 @@ function scene:update()
 
 	self.birdThrust = 0
 	self.birdLift = 0
+
+	-- Add to the score based on the distance from the score line. 
+	-- Score is added based on distance traveled so it should be frame rate independant.
+	local distanceFromLine = self.levelLine:getDistance()
+	local minDistance = 50
+	local maxDistance = 300
+	local minScore = 0
+	local maxScore = 0.02
+
+	local scoreToAdd = math.remap(minDistance, maxDistance, maxScore, minScore, distanceFromLine)
+	self.score += scoreToAdd * moveXDelta
 end
 
 function scene:setWingDirection(wingDirection)

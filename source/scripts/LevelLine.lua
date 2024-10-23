@@ -1,6 +1,9 @@
 LevelLine = {}
 class("LevelLine").extends(NobleSprite)
 
+-- The 0 position is actually based on the bird sprite and all a bit screwy so just hard code this here.
+local BirdYOffset = 150
+
 function LevelLine:init(data, scene)
 	LevelLine.super.init(self)
 
@@ -28,8 +31,7 @@ function LevelLine:draw(x, y)
     local yPos = self.scene.yPos
 
     local lineToScreenX = xPos
-    -- The 0 position is actually based on the bird sprite and all a bit screwy so just hard code this here.
-    local lineToScreenY = yPos - 150
+    local lineToScreenY = yPos - BirdYOffset
 
     local startIndex = self.currentIndex
     -- Add 1 as a line is 2 points and we want the start and end.
@@ -63,4 +65,36 @@ function LevelLine:draw(x, y)
     end
 
     Graphics.popContext()
+end
+
+function LevelLine:getDistance()
+    -- Get the current line segment that is in the center of the screen.
+    local xPos = self.scene.xPos
+    local yPos = self.scene.yPos
+
+    local lineToScreenX = xPos
+    local lineToScreenY = yPos - BirdYOffset
+
+    local startIndex = self.currentIndex
+    -- Add 1 as a line is 2 points and we want the start and end.
+    for i = startIndex + 1, #self.data, 1 do
+        local lineStart = self.data[i - 1]
+        local lineEnd = self.data[i]
+
+        -- Offset the pos so it is in the correct position as nothing really moves. This ignores draw offset so do x and y.
+        local startX = lineStart[1] - lineToScreenX
+        local startY = lineStart[2] - lineToScreenY
+        local endX = lineEnd[1] - lineToScreenX
+        local endY = lineEnd[2] - lineToScreenY
+
+        if endX >= 200 then
+            -- Found our line so get the distance.
+            local m = (endY - startY) / (endX - startX)
+            local c = startY - (m * startX)
+            local y = (m * 0 + c) + lineToScreenY
+            return math.abs(yPos - y)
+        end
+    end
+
+    return nil
 end

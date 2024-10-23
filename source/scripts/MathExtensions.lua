@@ -18,8 +18,22 @@ function math.sign(x)
     return (x > 0 and 1) or (x == 0 and 0) or -1
 end
 
-function math.remap(x, low1, high1, low2, high2)
-    return low2 + (x - low1) * (high2 - low2) / (high1 - low1)
+function math.invLerp(a, b, v)
+    return math.clamp(math.invLerpUnclamped(a, b, v), 0, 1)
+end
+
+function math.invLerpUnclamped(a, b, v)
+    return (v - a) / (b - a)
+end
+
+function math.remap(inMin, inMax, outMin, outMax, v)
+    local t = math.invLerp(inMin, inMax, v)
+    return math.lerp(outMin, outMax, t)
+end
+
+function math.remapUnclamped(inMin, inMax, outMin, outMax, v)
+    local t = math.invLerpUnclamped(inMin, inMax, v)
+    return math.lerp(outMin, outMax, t)
 end
 
 function math.roundToNearestMultiple(x, factor)
