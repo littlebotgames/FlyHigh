@@ -31,3 +31,9 @@ function Graphics.sprite:drawChildAnimationFrame(animation, frameNumber, x, y, i
 	animation:drawFrame(frameNumber, nil, drawX - imageOffsetX, drawY - imageOffsetY)
 	return imageOffsetX, imageOffsetY
 end
+
+function Graphics.sprite:getLocalBoundsRect()
+	local boundsRect = self:getBoundsRect()
+	boundsRect:offset(-boundsRect.x, -boundsRect.y)
+	return boundsRect
+end

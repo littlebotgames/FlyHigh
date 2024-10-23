@@ -2,6 +2,9 @@ import "scripts/BackgroudLayer"
 import "scripts/Enums/FlapPosition"
 import "scripts/Enums/WingDirection"
 import "scripts/MathExtensions"
+import "scripts/LevelLine"
+
+import "assets/data/Level01"
 
 GameScene = {}
 class("GameScene").extends(NobleScene)
@@ -10,22 +13,29 @@ local scene = GameScene
 scene.baseColor = Graphics.kColorWhite
 
 -- Constants.
-local BaseDrag = -20
+local BaseDrag = -60
 local WingDirDragOffset =
 {
 	[WingDirection.Down] = 0,
-	[WingDirection.Back] = 5,
-	[WingDirection.Forward] = -5
+	[WingDirection.Back] = 20,
+	[WingDirection.Forward] = -20
 }
-local OnGroundDragOffset = -30
+local OnGroundDragOffset = -80
 
-local Gravity = 50
-local BirdFlapStrength = 1000
-local RunAccel = 50
-local MaxRunSpeed = 100
+local Gravity = 200
+local BirdFlapStrength = 4000
+local RunAccel = 150
+local MaxRunSpeed = 150
+local MaxFlySpeed = 400
+
+function scene:createLevel()
+	self.levelLine = LevelLine(Level01, self)
+end
 
 function scene:init()
 	scene.super.init(self)
+
+	self:createLevel()
 
 	local function createTree()
 		local sprite = NobleSprite("assets/images/tree01")
@@ -35,15 +45,40 @@ function scene:init()
 	local function getTreeSpawnY()
 		return math.random(0, 100)
 	end
-	self.treeLayer = BackgroundLayer.new(createTree, 4, 0.5, getTreeSpawnY)
+	self.treeLayer = BackgroundLayer.new(createTree, 4, 0.5, getTreeSpawnY, 800)
 
 	local function getTreeForegroundSpawnY()
-		return math.random(200, 300)
+		return math.random(215, 300)
 	end
-	self.treeForegroundLayer = BackgroundLayer.new(createTree, 1, 1.2, getTreeForegroundSpawnY)
+	self.treeForegroundLayer = BackgroundLayer.new(createTree, 1, 1.2, getTreeForegroundSpawnY, 800)
 
 	--self.house = NobleSprite("assets/images/house01")
 	--self.house:setCenter(0.5, 1)
+
+	local function createFoliage()
+		local random = math.random(3)
+		local sprite = nil
+		if random == 1 then
+			sprite = NobleSprite("assets/images/rocks01")
+		elseif random == 2 then
+			sprite = NobleSprite("assets/images/grass01")
+		elseif random == 3 then
+			sprite = NobleSprite("assets/images/leaves01")
+		end
+		if sprite then
+			sprite:setCenter(0.5, 1)
+		end
+        return sprite
+	end
+	local function getFoliageSpawnY()
+		return math.random(120, 145)
+	end
+	self.foliageLayer1 = BackgroundLayer.new(createFoliage, 5, 0.9, getFoliageSpawnY, 800)
+
+	local function getFoliageForegroundSpawnY()
+		return math.random(185, 210)
+	end
+	self.foliageLayer2 = BackgroundLayer.new(createFoliage, 5, 1.1, getFoliageForegroundSpawnY, 800)
 
 	local function createCloud()
 		local index = math.random(3)
@@ -58,7 +93,7 @@ function scene:init()
 	local function getCloudSpawnY()
 		return math.random(-1000, -500)
 	end
-	self.cloudLayer = BackgroundLayer.new(createCloud, 4, 0.3, getCloudSpawnY)
+	self.cloudLayer = BackgroundLayer.new(createCloud, 4, 0.3, getCloudSpawnY, 800)
 
 	self.birdHead = NobleSprite("assets/images/head", true)
 	self.birdHead:setSize(64, 64)
@@ -109,6 +144,7 @@ function scene:init()
 	self.birdLegs.animation:setState(self.birdLegs.animation.run)
 	--self.birdRunningSound:play(0)
 
+	self.xPos = 0
 	self.yPos = 0
 
 	-- Bird flight vars.
@@ -162,19 +198,26 @@ function scene:enter()
 
 	self.cloudLayer:add()
 	self.treeLayer:add()
+	self.foliageLayer1:add()
 
 	--self.house:add(10, 240)
+
+	self.levelLine:add()
 
 	self.birdBody:add(200, 120)
 	self.birdHead:add(245, 75)
 	self.birdLegs:add(200, 148)
 	self.birdWings:add(195, 110)
 
+	self.foliageLayer2:add()
 	self.treeForegroundLayer:add()
 end
 
 function scene:exit()
+	self.levelLine:remove()
+
 	self.treeForegroundLayer:remove()
+	self.foliageLayer2:remove()
 
 	self.birdHead:remove()
 	self.birdBody:remove()
@@ -183,6 +226,7 @@ function scene:exit()
 
 	--self.house:remove()
 
+	self.foliageLayer1:remove()
 	self.cloudLayer:remove()
 	self.treeLayer:remove()
 
@@ -218,6 +262,11 @@ function scene:update()
 		drag += OnGroundDragOffset
 	end
 
+	if not self.grounded and self.birdVelX > MaxFlySpeed then
+		-- Add additional drag to slow down to max speed.
+		drag += OnGroundDragOffset * 4
+	end
+
 	self.birdVelX = math.max(self.birdVelX + drag * Noble.elapsedTime, 0)
 	-- Rise due to going fast.
 	self.birdLift -= self.birdVelX * Noble.elapsedTime
@@ -225,6 +274,7 @@ function scene:update()
 	self.birdVelY += accelY * Noble.elapsedTime
 
 	local moveXDelta = self.birdVelX * Noble.elapsedTime
+	self.xPos += moveXDelta
 	self.yPos += self.birdVelY * Noble.elapsedTime
 
 	-- Clamp to ground position.
@@ -253,6 +303,8 @@ function scene:update()
 	self.treeLayer:move(moveXDelta)
 	self.cloudLayer:move(moveXDelta)
 	self.treeForegroundLayer:move(moveXDelta)
+	self.foliageLayer1:move(moveXDelta)
+	self.foliageLayer2:move(moveXDelta)
 
 	-- Move in the Y.
 	Graphics.setDrawOffset(0, -self.yPos)
@@ -275,11 +327,11 @@ end
 
 function scene.wingDirectionToVec(wingDirection)
 	if wingDirection == WingDirection.Down then
-		return 0, 1
+		return math.degToDir(90 + 10)
 	elseif wingDirection == WingDirection.Back then
-		return -0.707, 0.707
+		return math.degToDir(90 + 50)
 	elseif wingDirection == WingDirection.Forward then
-		return 0.707, 0.707
+		return math.degToDir(90 - 50)
 	end
 end
 
@@ -292,7 +344,7 @@ function scene:doFlap(flapPos)
 		-- Flap down.
 		self.birdWings.animation:setState(self.birdWings.animation.flapDown)
 		-- We get thrust in the opposite direction to the wing.
-		self.birdThrust += BirdFlapStrength * -self.birdWingDirX
+		self.birdThrust += BirdFlapStrength * 0.5 * -self.birdWingDirX
 		self.birdLift += BirdFlapStrength * -self.birdWingDirY
 		self.birdWingFlapSound:play(1)
 	end
