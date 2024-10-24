@@ -4,6 +4,7 @@ import "scripts/Enums/WingDirection"
 import "scripts/MathExtensions"
 import "scripts/LevelLine"
 import "scripts/UI/ScoreUI"
+import 'scenes/MainMenuScene'
 
 import "assets/data/Level01"
 
@@ -328,13 +329,20 @@ function scene:update()
 	-- Add to the score based on the distance from the score line. 
 	-- Score is added based on distance traveled so it should be frame rate independant.
 	local distanceFromLine = self.levelLine:getDistance()
-	local minDistance = 50
-	local maxDistance = 300
-	local minScore = 0
-	local maxScore = 0.02
+	if distanceFromLine then
+		local minDistance = 50
+		local maxDistance = 300
+		local minScore = 0
+		local maxScore = 0.02
 
-	local scoreToAdd = math.remap(minDistance, maxDistance, maxScore, minScore, distanceFromLine)
-	self.score += scoreToAdd * moveXDelta
+		local scoreToAdd = math.remap(minDistance, maxDistance, maxScore, minScore, distanceFromLine)
+		self.score += scoreToAdd * moveXDelta
+	else
+		-- Level is finished.
+		self.levelFinished = true
+		-- Restart.
+		playdate.timer.new(3 * 1000, function() Noble.transition(MainMenuScene) end)
+	end
 end
 
 function scene:setWingDirection(wingDirection)
