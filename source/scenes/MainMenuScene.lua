@@ -9,6 +9,8 @@ scene.baseColor = Graphics.kColorWhite
 local sequence
 
 local padding = 10
+local menuBGWidth = 280
+local menuBGHeight = 130
 
 function scene:init()
 	scene.super.init(self)
@@ -38,9 +40,6 @@ function scene:init()
 	self.logoSprite:setCenter(0, 0)
 
 	-- Create menu options background sprite.
-	local menuBGWidth = 280
-	local menuBGHeight = 130
-
 	local menuBGImage = Graphics.image.new(menuBGWidth, menuBGHeight)
 	Graphics.pushContext(menuBGImage)
 
@@ -59,7 +58,22 @@ function scene:init()
 	-- Add bird sprite.
 	self.birdSprite = NobleSprite("assets/images/birb")
 
-	self.defaultInputHandler = {
+	self.menu = Noble.Menu.new(
+		true,
+		Noble.Text.ALIGN_CENTER,
+		false,
+		Graphics.kColorWhite,
+		4,
+		6,
+		Noble.Text.large,
+		Noble.Text.FONT_LARGE,
+		3
+	)
+	self.menu:addItem("Play Game", function() Noble.transition(GameScene) end)
+	self.menu:addItem("Options", function() end)
+	self.menu:addItem("Credits", function() end)
+
+	self.inputHandler = {
 		upButtonDown = function()
 			self.menu:selectPrevious()
 		end,
@@ -130,6 +144,8 @@ function scene:update()
 	Graphics.setColor(Graphics.kColorBlack)
 	local menuBGX = sequence:get()
 	self.menuBGSprite:moveTo(menuBGX, self.menuBGSprite.y)
+
+	self.menu:draw(menuBGX + menuBGWidth / 2, self.menuBGSprite.y + padding)
 
 	Graphics.popContext()
 end

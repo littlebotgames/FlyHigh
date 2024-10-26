@@ -1,6 +1,5 @@
 import "scripts/BackgroudLayer"
 import "scripts/Enums/FlapPosition"
-import "scripts/Enums/WingDirection"
 import "scripts/MathExtensions"
 import "scripts/LevelLine"
 import "scripts/UI/ScoreUI"
@@ -16,12 +15,6 @@ scene.baseColor = Graphics.kColorWhite
 
 -- Constants.
 local BaseDrag = -60
-local WingDirDragOffset =
-{
-	[WingDirection.Down] = 0,
-	[WingDirection.Back] = 20,
-	[WingDirection.Forward] = -20
-}
 local OnGroundDragOffset = -80
 
 local Gravity = 200
@@ -29,6 +22,12 @@ local BirdFlapStrength = 4000
 local RunAccel = 150
 local MaxRunSpeed = 150
 local MaxFlySpeed = 400
+local FlapTimeSecs = 0.15
+
+local MinWingAngle = 120
+local MaxWingAngle = 240
+local NumSteps = 8
+local WingAngleStep = (MaxWingAngle - MinWingAngle) / NumSteps
 
 function scene:createLevel()
 	self.levelLine = LevelLine(Level01, self)
@@ -122,15 +121,14 @@ function scene:init()
 	self.birdWings:setIgnoresDrawOffset(true)
 
 	self.birdWings.animation:addState("default", 1, 1, nil, true)
-	self.birdWings.animation:addState("flapUp", 1, 1)
-	self.birdWings.animation:addState("flapDown", 2, 2)
+	self.birdWings.animation:addState("flapDown", 1, 1)
+	self.birdWings.animation:addState("flapUp", 2, 2)
 	self.birdWingFlapSound = playdate.sound.sampleplayer.new("assets/audio/wing-flap-1")
 
 	-- Get rotated images for the wings for when the direction is set.
 	self.birdWingsImageTables = {}
-	for i = 1, WingDirection.length, 1 do
-		local dirX, dirY = self.wingDirectionToVec(i)
-		local angleDeg = math.dirToDeg(dirX, dirY) - 90
+	for i = 1, NumSteps + 1, 1 do
+		local angleDeg = MinWingAngle + (i - 1) * WingAngleStep
 		local imageTable = Graphics.imagetable.new("assets/images/wings")
 		for imageIndex = 1, #imageTable, 1 do
 			local image = imageTable:getImage(imageIndex)
@@ -139,11 +137,9 @@ function scene:init()
 			self.birdWingsImageTables[i] = imageTable
 		end
 	end
-
 	self.grounded = true
 
 	-- Initialise anims.
-	self.birdWings.animation:setState(self.birdWings.animation.flapUp)
 	self.birdLegs.animation:setState(self.birdLegs.animation.run)
 	--self.birdRunningSound:play(0)
 
@@ -152,49 +148,38 @@ function scene:init()
 
 	-- Bird flight vars.
 	self.birdFlapPos = FlapPosition.Down
+	self.birdWings.animation:setState(self.birdWings.animation.flapDown)
 
 	self.birdVelX = 0
 	self.birdVelY = 0
 
 	self.birdLift = 0
 	self.birdThrust = 0
+	self.isFlapping = false
 
-	self:setWingDirection(WingDirection.Down)
+	self:setWingDirectionFromCrank()
 
 	self.score = 0
 
 	self.inputHandler = {
 		downButtonDown = function()
-			self:setWingDirection(WingDirection.Down)
+			self:startFlap()
 		end,
 		rightButtonDown = function()
-			self:setWingDirection(WingDirection.Forward)
+			self:startFlap()
 		end,
 		leftButtonDown = function()
-			self:setWingDirection(WingDirection.Back)
+			self:startFlap()
 		end,
 		cranked = function(change, acceleratedChange)
-			local crankPos = playdate.getCrankPosition()
-			if self.birdFlapPos == FlapPosition.Up and crankPos > 135 and crankPos < 225 then
-				self:doFlap(FlapPosition.Down)
-			elseif self.birdFlapPos == FlapPosition.Down and crankPos > 315 or crankPos < 45 then
-				self:doFlap(FlapPosition.Up)
-			end
+			self:setWingDirectionFromCrank()
 		end,
 		AButtonDown = function()
-			if self.birdFlapPos == FlapPosition.Down then
-				self:doFlap(FlapPosition.Up)
-			elseif self.birdFlapPos == FlapPosition.Up then
-				self:doFlap(FlapPosition.Down)
-			end
+			self:startFlap()
 		end,
-		--[[
 		BButtonDown = function()
-			if self.birdFlapPos == FlapPosition.Up then
-				doFlap(FlapPosition.Down)
-			end
+			self:startFlap()
 		end
-		--]]
 	}
 end
 
@@ -255,6 +240,15 @@ end
 
 function scene:update()
 	scene.super.update(self)
+
+	-- Update flapping state.
+	if self.birdFlapPos == FlapPosition.Up then
+		self.flapTimer -= Noble.elapsedTime
+		if self.flapTimer <= 0 then
+			self.flapTimer = 0
+			self:doFlap(FlapPosition.Down)
+		end
+	end
 	
 	local accelX = self.birdThrust
 	if self.grounded and self.birdVelX < MaxRunSpeed then
@@ -264,7 +258,7 @@ function scene:update()
 	self.birdVelX += accelX * Noble.elapsedTime
 
 	-- Get current drag to use.
-	local drag = BaseDrag + WingDirDragOffset[self.wingDirection]
+	local drag = BaseDrag
 	if self.grounded and self.birdVelX > MaxRunSpeed then
 		-- Add additional drag to slow down to max running speed.
 		drag += OnGroundDragOffset
@@ -345,22 +339,6 @@ function scene:update()
 	end
 end
 
-function scene:setWingDirection(wingDirection)
-	self.wingDirection = wingDirection
-	self.birdWingDirX, self.birdWingDirY = self.wingDirectionToVec(wingDirection)
-	self.birdWings:setAnimationImageTable(self.birdWingsImageTables[wingDirection])
-end
-
-function scene.wingDirectionToVec(wingDirection)
-	if wingDirection == WingDirection.Down then
-		return math.degToDir(90 + 10)
-	elseif wingDirection == WingDirection.Back then
-		return math.degToDir(90 + 50)
-	elseif wingDirection == WingDirection.Forward then
-		return math.degToDir(90 - 50)
-	end
-end
-
 function scene:doFlap(flapPos)
 	self.birdFlapPos = flapPos
 	if self.birdFlapPos == FlapPosition.Up then
@@ -374,4 +352,34 @@ function scene:doFlap(flapPos)
 		self.birdLift += BirdFlapStrength * -self.birdWingDirY
 		self.birdWingFlapSound:play(1)
 	end
+end
+
+function scene:startFlap()
+	if self.birdFlapPos == FlapPosition.Up then
+		-- Already flapping so this will queue up another one for when the current on has finished.
+		return
+	end
+
+	self:doFlap(FlapPosition.Up)
+	self.flapTimer = FlapTimeSecs
+end
+
+function scene:setWingDirectionFromCrank()
+	local deg = playdate.getCrankPosition()
+	self.wingDirection = self.getWingImageIndexFromDeg(deg)
+	deg = math.roundToNearestMultiple(deg, WingAngleStep)
+	self.birdWingDirX, self.birdWingDirY = math.degToDir(deg - 90)
+	self.birdWings:setAnimationImageTable(self.birdWingsImageTables[self.wingDirection])
+end
+
+function scene.getWingImageIndexFromDeg(deg)
+	deg = math.getDeg0To360(deg)
+	deg = math.clamp(deg, MinWingAngle, MaxWingAngle)
+	deg = math.roundToNearestMultiple(deg, WingAngleStep)
+	
+	-- Get 0 indexed index.
+	local i = math.round((deg - MinWingAngle) / WingAngleStep)
+	i = math.clamp(i, 0, NumSteps)
+	-- Add 1 for table index.
+	return i + 1
 end
