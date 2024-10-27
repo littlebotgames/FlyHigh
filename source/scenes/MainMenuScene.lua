@@ -56,7 +56,13 @@ function scene:init()
 	local crankTick = 0
 
 	-- Add bird sprite.
-	self.birdSprite = NobleSprite("assets/images/birb")
+	local function createBird()
+		return NobleSprite("assets/images/NPCDuck")
+	end
+	local function getBirdSpawnY()
+		return 50
+	end
+	self.birdSpriteLayer = BackgroundLayer.new(createBird, 8, 1, getBirdSpawnY, 800)
 
 	self.menu = Noble.Menu.new(
 		true,
@@ -66,12 +72,16 @@ function scene:init()
 		4,
 		6,
 		Noble.Text.large,
-		Noble.Text.FONT_LARGE,
+		Noble.Text.FONT_MEDIUM,
 		3
 	)
-	self.menu:addItem("Play Game", function() Noble.transition(GameScene) end)
-	self.menu:addItem("Options", function() end)
-	self.menu:addItem("Credits", function() end)
+	self.menu:addItem("Play Game", function()
+		GlobalData.levelIndex = 1
+		Noble.transition(GameScene)
+	end)
+	--self.menu:addItem("Options", function() end)
+	self.menu:addItem("Credits", function() UIManager:showPage(UIPageID.Credits) end)
+	self.menu:select(1)
 
 	self.inputHandler = {
 		upButtonDown = function()
@@ -113,7 +123,7 @@ function scene:enter()
 	sequence:start();
 	self.menuBGSprite:add(startX, startY)
 
-	self.birdSprite:add(300, 50)
+	self.birdSpriteLayer:add()
 
 	local menu = playdate.getSystemMenu()
 	menu:addCheckmarkMenuItem(
@@ -138,23 +148,29 @@ end
 function scene:update()
 	scene.super.update(self)
 
-	Graphics.pushContext()
+	if not UIManager:isShowing(UIPageID.Credits) then
 
-	-- Draw menu.
-	Graphics.setColor(Graphics.kColorBlack)
-	local menuBGX = sequence:get()
-	self.menuBGSprite:moveTo(menuBGX, self.menuBGSprite.y)
+		Graphics.pushContext()
 
-	self.menu:draw(menuBGX + menuBGWidth / 2, self.menuBGSprite.y + padding)
+		-- Draw menu.
+		Graphics.setColor(Graphics.kColorBlack)
+		local menuBGX = sequence:get()
+		self.menuBGSprite:moveTo(menuBGX, self.menuBGSprite.y)
 
-	Graphics.popContext()
+		self.menu:draw(menuBGX + menuBGWidth / 2, self.menuBGSprite.y + padding)
+
+		Graphics.popContext()
+
+	end
+
+	self.birdSpriteLayer:move(100 * Noble.elapsedTime)
 end
 
 function scene:exit()
 	sequence = Sequence.new():from(100):to(-200, 0.25, Ease.inSine)
 	sequence:start();
 
-	self.birdSprite:remove()
+	self.birdSpriteLayer:remove()
 	self.menuBGSprite:remove()
 	self.logoSprite:remove()
 

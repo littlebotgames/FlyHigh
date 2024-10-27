@@ -26,6 +26,6 @@ function ScoreUI:draw(x, y)
     Graphics.drawRect(0, 0, 100, 50)
 
     Noble.Text.setFont(Noble.Text.FONT_LARGE)
-    Graphics.drawTextInRect(tostring(math.round(self.scene.score)), 10, 10, 90, 40, nil, nil, kTextAlignment.center)
+    Graphics.drawTextInRect(tostring(math.floor(self.scene.score)), 10, 10, 90, 40, nil, nil, kTextAlignment.center)
     Graphics.popContext()
 end

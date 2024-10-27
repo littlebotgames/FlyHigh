@@ -1,5 +1,6 @@
 import 'libraries/noble/Noble'
 import 'utilities/Utilities'
+import 'scenes/MainMenuScene'
 import 'scenes/GameScene'
 
 Noble.Settings.setup({
@@ -17,7 +18,7 @@ Noble.Text.FONT_MEDIUM = Graphics.font.new("assets/fonts/Roobert-20-Medium")
 Noble.Text.FONT_LARGE = Graphics.font.new("assets/fonts/Roobert-24-Medium")
 Noble.Text.FONT_SMALL = Graphics.font.new("assets/fonts/Roobert-11-Medium")
 
-Noble.new(GameScene, 1.5)
+Noble.new(MainMenuScene, 1.5)
 Graphics.sprite.setAlwaysRedraw(false)
 
 local function saveCurrentScene()

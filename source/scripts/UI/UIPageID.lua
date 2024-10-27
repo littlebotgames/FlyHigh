@@ -1,5 +1,7 @@
 import "scripts/EnumUtils"
 
 UIPageID = EnumUtils.createEnum({
-    "Dialogue"
+    "Dialogue",
+    "LevelEnd",
+    "Credits"
 })

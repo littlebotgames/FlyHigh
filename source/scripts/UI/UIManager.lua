@@ -1,15 +1,16 @@
+import "scripts/UI/UIPageID"
 import "scripts/UI/DialogueBox"
+import "scripts/UI/LevelEndUI"
+import "scripts/UI/CreditsUI"
+import "scripts/TableExtensions"
 
 UIManager = {}
-
-UIPageID = 
-{
-    Dialogue = "Dialogue",
-}
 
 local Pages = 
 {
     [UIPageID.Dialogue] = DialogueBox(),
+    [UIPageID.LevelEnd] = LevelEndUI(),
+    [UIPageID.Credits] = CreditsUI(),
 }
 
 UIManager.currentPages = {}

@@ -3,9 +3,11 @@ import "scripts/Enums/FlapPosition"
 import "scripts/MathExtensions"
 import "scripts/LevelLine"
 import "scripts/UI/ScoreUI"
+import "scripts/UI/UIManager"
+import "scripts/UI/UIPageID"
 import 'scenes/MainMenuScene'
 
-import "assets/data/Level01"
+import "assets/data/Levels"
 
 GameScene = {}
 class("GameScene").extends(NobleScene)
@@ -29,14 +31,17 @@ local MaxWingAngle = 240
 local NumSteps = 8
 local WingAngleStep = (MaxWingAngle - MinWingAngle) / NumSteps
 
-function scene:createLevel()
-	self.levelLine = LevelLine(Level01, self)
+function scene:createLevel(levelData)
+	self.levelLine = LevelLine(levelData, self)
 end
 
 function scene:init()
 	scene.super.init(self)
 
-	self:createLevel()
+	if GlobalData.levelIndex == nil then
+		GlobalData.levelIndex = 1
+	end
+	self:createLevel(Levels[GlobalData.levelIndex])
 	self.scoreUI = ScoreUI(self)
 
 	local function createTree()
@@ -178,7 +183,7 @@ function scene:init()
 			self:startFlap()
 		end,
 		BButtonDown = function()
-			self:startFlap()
+			UIManager:showPage(UIPageID.LevelEnd, { score = math.floor(self.score) })
 		end
 	}
 end
@@ -320,22 +325,26 @@ function scene:update()
 	self.birdThrust = 0
 	self.birdLift = 0
 
-	-- Add to the score based on the distance from the score line. 
-	-- Score is added based on distance traveled so it should be frame rate independant.
-	local distanceFromLine = self.levelLine:getDistance()
-	if distanceFromLine then
-		local minDistance = 50
-		local maxDistance = 300
-		local minScore = 0
-		local maxScore = 0.02
+	if not self.levelFinished then
+		-- Add to the score based on the distance from the score line. 
+		-- Score is added based on distance traveled so it should be frame rate independant.
+		local distanceFromLine = self.levelLine:getDistance()
+		if distanceFromLine then
+			local minDistance = 50
+			local maxDistance = 300
+			local minScore = 0
+			local maxScore = 0.02
 
-		local scoreToAdd = math.remap(minDistance, maxDistance, maxScore, minScore, distanceFromLine)
-		self.score += scoreToAdd * moveXDelta
-	else
-		-- Level is finished.
-		self.levelFinished = true
-		-- Restart.
-		playdate.timer.new(3 * 1000, function() Noble.transition(MainMenuScene) end)
+			local scoreToAdd = math.remap(minDistance, maxDistance, maxScore, minScore, distanceFromLine)
+			self.score += scoreToAdd * moveXDelta
+		else
+			-- Level is finished.
+			self.levelFinished = true
+			-- Restart.
+			playdate.timer.performAfterDelay(3 * 1000, function()
+				UIManager:showPage(UIPageID.LevelEnd)
+			end)
+		end
 	end
 end
 
